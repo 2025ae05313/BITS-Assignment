@@ -1,0 +1,187 @@
+name: ci-cd
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  IMAGE_NAME: heart-disease-api
+
+jobs:
+  # ------------------------------------------------------------------ lint --
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install flake8
+        run: pip install flake8==7.4.1
+      - name: Lint (fails the pipeline on any violation)
+        run: |
+          flake8 src app tests scripts --tee --output-file=flake8-report.txt \
+            --format='%(path)s:%(row)d:%(col)d: %(code)s %(text)s'
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake8-report
+          path: flake8-report.txt
+
+  # ------------------------------------------------------------------ test --
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install dependencies (clean setup from requirements file)
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+      - name: Run unit + integration tests
+        run: |
+          mkdir -p test-results
+          pytest -v --junitxml=test-results/junit.xml \
+            --cov=src/heartml --cov=app --cov-report=xml:test-results/coverage.xml \
+            --cov-report=term-missing --cov-fail-under=80
+      - name: Publish test summary
+        if: always()
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET
+          r = ET.parse("test-results/junit.xml").getroot()
+          s = r if r.tag == "testsuite" else r.find("testsuite")
+          print("### Test results")
+          print(f"- tests: {s.get('tests')}, failures: {s.get('failures')}, errors: {s.get('errors')}, skipped: {s.get('skipped')}")
+          c = ET.parse("test-results/coverage.xml").getroot()
+          print(f"- line coverage: {float(c.get('line-rate')) * 100:.1f}%")
+          EOF
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+
+  # ----------------------------------------------------------------- train --
+  train:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+      - name: Download + clean dataset
+        run: python scripts/download_data.py
+      - name: EDA figures
+        run: python scripts/run_eda.py
+      - name: Train, tune and track with MLflow
+        run: python scripts/train.py 2>&1 | tee training.log
+      - name: Quality gate (fail if selected model is too weak)
+        run: |
+          python - <<'EOF'
+          import json, sys
+          m = json.load(open("models/model_metadata.json"))
+          auc = m["cv_metrics"]["roc_auc_mean"]
+          print(f"Selected {m['model_family']} | CV ROC-AUC {auc:.3f} | test {m['test_metrics']}")
+          sys.exit(0 if auc >= 0.85 else f"CV ROC-AUC {auc:.3f} below gate 0.85")
+          EOF
+      - name: Training summary
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          s = json.load(open("reports/training_summary.json"))
+          print("### Model comparison (5-fold CV)")
+          print("| model | ROC-AUC | accuracy | precision | recall | F1 | test ROC-AUC |")
+          print("|---|---|---|---|---|---|---|")
+          for k, v in s["models"].items():
+              c, t = v["cv"], v["test"]
+              print(f"| {k} | {c['roc_auc_mean']:.3f} | {c['accuracy_mean']:.3f} | {c['precision_mean']:.3f} | {c['recall_mean']:.3f} | {c['f1_mean']:.3f} | {t['test_roc_auc']:.3f} |")
+          print(f"\n**Selected:** {s['selected_model']}")
+          EOF
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: model
+          path: |
+            models/model.joblib
+            models/model_metadata.json
+            models/mlflow_model/
+      - name: Upload MLflow runs, figures and logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-and-reports
+          path: |
+            mlruns/
+            mlflow.db
+            reports/
+            training.log
+
+  # ---------------------------------------------------------------- docker --
+  docker:
+    runs-on: ubuntu-latest
+    needs: train
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use the model trained in this run
+        uses: actions/download-artifact@v4
+        with:
+          name: model
+          path: models/
+      - name: Build image
+        run: docker build -t $IMAGE_NAME:${{ github.sha }} -t $IMAGE_NAME:latest .
+      - name: Container smoke test
+        run: |
+          docker run -d --name api -p 8000:8000 $IMAGE_NAME:latest
+          for i in $(seq 1 30); do curl -sf localhost:8000/ready && break; sleep 1; done
+          echo "--- /predict"
+          curl -sf -X POST localhost:8000/predict -H 'Content-Type: application/json' \
+            -d @scripts/sample_request.json | tee predict.json
+          python -c "import json; r=json.load(open('predict.json')); assert r['prediction'] in (0,1) and 0<=r['confidence']<=1"
+          echo; echo "--- invalid input must be rejected"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8000/predict -H 'Content-Type: application/json' -d '{"age": 500}')" = "422"
+          curl -sf localhost:8000/metrics | grep model_predictions_total
+      - name: Container logs
+        if: always()
+        run: docker logs api > container.log 2>&1; cat container.log
+      - name: Save image
+        run: docker save $IMAGE_NAME:latest | gzip > heart-disease-api.tar.gz
+      - name: Upload image + logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: |
+            heart-disease-api.tar.gz
+            container.log
+          retention-days: 7
+      - name: Push to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          for tag in ${{ github.sha }} latest; do
+            docker tag $IMAGE_NAME:latest ghcr.io/$OWNER/$IMAGE_NAME:$tag
+            docker push ghcr.io/$OWNER/$IMAGE_NAME:$tag
+          done

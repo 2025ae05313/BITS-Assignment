@@ -1,0 +1,9 @@
+# Minimal runtime for the serving container (no training / tracking libraries)
+numpy==2.5.3
+pandas==3.0.5
+scikit-learn==1.9.1
+joblib==1.6.0
+fastapi==0.146.0
+uvicorn==0.53.0
+pydantic==2.13.5
+prometheus-client==0.26.0

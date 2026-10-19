@@ -1,0 +1,156 @@
+{
+  "selected_model": "logistic_regression",
+  "baseline": {
+    "cv_accuracy_mean": 0.5413265306122448,
+    "cv_precision_mean": 0.0,
+    "cv_recall_mean": 0.0,
+    "cv_f1_mean": 0.0,
+    "cv_roc_auc_mean": 0.5,
+    "test_accuracy": 0.5409836065573771,
+    "test_precision": 0.0,
+    "test_recall": 0.0,
+    "test_f1": 0.0,
+    "test_roc_auc": 0.5
+  },
+  "models": {
+    "logistic_regression": {
+      "run_id": "8ba78a76c2474065a81e2a9e6c9fc052",
+      "best_params": {
+        "C": 0.1,
+        "class_weight": "None",
+        "l1_ratio": 0.0
+      },
+      "cv": {
+        "accuracy_mean": 0.846938775510204,
+        "accuracy_std": 0.028985250238042312,
+        "precision_mean": 0.8694637275199935,
+        "precision_std": 0.06618372316396152,
+        "recall_mean": 0.7920948616600791,
+        "recall_std": 0.04823754020752284,
+        "f1_mean": 0.8261551424645459,
+        "f1_std": 0.029752886080544997,
+        "roc_auc_mean": 0.9116938616938619,
+        "roc_auc_std": 0.017387117762396005
+      },
+      "test": {
+        "test_accuracy": 0.8852459016393442,
+        "test_precision": 0.8387096774193549,
+        "test_recall": 0.9285714285714286,
+        "test_f1": 0.8813559322033898,
+        "test_roc_auc": 0.9621212121212122
+      },
+      "train_minus_cv_roc_auc": 0.013656424723840321,
+      "n_candidates": 28,
+      "figures": [
+        "/home/claude/heart-disease-mlops/reports/figures/models/logistic_regression/confusion_matrix.png",
+        "/home/claude/heart-disease-mlops/reports/figures/models/logistic_regression/roc_curve.png",
+        "/home/claude/heart-disease-mlops/reports/figures/models/logistic_regression/pr_curve.png",
+        "/home/claude/heart-disease-mlops/reports/figures/models/logistic_regression/feature_importance.png"
+      ]
+    },
+    "random_forest": {
+      "run_id": "f8b287b89d4a476eac3cb7ed2e5615ad",
+      "best_params": {
+        "max_depth": "None",
+        "max_features": "sqrt",
+        "min_samples_leaf": 3,
+        "n_estimators": 500
+      },
+      "cv": {
+        "accuracy_mean": 0.8096088435374149,
+        "accuracy_std": 0.03207078988558619,
+        "precision_mean": 0.8083638583638584,
+        "precision_std": 0.050344798755233774,
+        "recall_mean": 0.7735177865612648,
+        "recall_std": 0.0826417847001059,
+        "f1_mean": 0.7867875198613318,
+        "f1_std": 0.04076791099945236,
+        "roc_auc_mean": 0.8984876637050551,
+        "roc_auc_std": 0.028937636786245134
+      },
+      "test": {
+        "test_accuracy": 0.8852459016393442,
+        "test_precision": 0.8387096774193549,
+        "test_recall": 0.9285714285714286,
+        "test_f1": 0.8813559322033898,
+        "test_roc_auc": 0.9534632034632036
+      },
+      "train_minus_cv_roc_auc": 0.08913821229160745,
+      "n_candidates": 36,
+      "figures": [
+        "/home/claude/heart-disease-mlops/reports/figures/models/random_forest/confusion_matrix.png",
+        "/home/claude/heart-disease-mlops/reports/figures/models/random_forest/roc_curve.png",
+        "/home/claude/heart-disease-mlops/reports/figures/models/random_forest/pr_curve.png",
+        "/home/claude/heart-disease-mlops/reports/figures/models/random_forest/feature_importance.png"
+      ]
+    }
+  },
+  "metadata": {
+    "model_name": "heart-disease-classifier",
+    "model_version": "20261019024132",
+    "model_family": "logistic_regression",
+    "best_params": {
+      "C": 0.1,
+      "class_weight": "None",
+      "l1_ratio": 0.0
+    },
+    "cv_metrics": {
+      "accuracy_mean": 0.846938775510204,
+      "accuracy_std": 0.028985250238042312,
+      "precision_mean": 0.8694637275199935,
+      "precision_std": 0.06618372316396152,
+      "recall_mean": 0.7920948616600791,
+      "recall_std": 0.04823754020752284,
+      "f1_mean": 0.8261551424645459,
+      "f1_std": 0.029752886080544997,
+      "roc_auc_mean": 0.9116938616938619,
+      "roc_auc_std": 0.017387117762396005
+    },
+    "test_metrics": {
+      "test_accuracy": 0.8852459016393442,
+      "test_precision": 0.8387096774193549,
+      "test_recall": 0.9285714285714286,
+      "test_f1": 0.8813559322033898,
+      "test_roc_auc": 0.9621212121212122
+    },
+    "decision_threshold": 0.5,
+    "features": [
+      "age",
+      "trestbps",
+      "chol",
+      "thalach",
+      "oldpeak",
+      "ca",
+      "sex",
+      "cp",
+      "fbs",
+      "restecg",
+      "exang",
+      "slope",
+      "thal"
+    ],
+    "numeric_features": [
+      "age",
+      "trestbps",
+      "chol",
+      "thalach",
+      "oldpeak",
+      "ca"
+    ],
+    "categorical_features": [
+      "sex",
+      "cp",
+      "fbs",
+      "restecg",
+      "exang",
+      "slope",
+      "thal"
+    ],
+    "training_rows": 242,
+    "mlflow_run_id": "8ba78a76c2474065a81e2a9e6c9fc052",
+    "python": "3.13.16",
+    "sklearn": "1.9.1",
+    "trained_at_utc": "2026-10-19T02:41:32+00:00",
+    "registry_version": 1
+  }
+}
